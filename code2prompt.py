@@ -7,6 +7,26 @@ def is_ignored(path, ignore_dirs):
             return True
     return False
 
+def generate_tree(dir_path, ignore_dirs, prefix=""):
+    tree_str = ""
+    try:
+        items = sorted(os.listdir(dir_path))
+    except PermissionError:
+        return ""
+
+    # 過濾掉不需要的資料夾
+    items = [item for item in items if not is_ignored(os.path.join(dir_path, item), ignore_dirs)]
+
+    for i, item in enumerate(items):
+        path = os.path.join(dir_path, item)
+        is_last = (i == len(items) - 1)
+        tree_str += prefix + ("└── " if is_last else "├── ") + item + "\n"
+        
+        if os.path.isdir(path):
+            extension = "    " if is_last else "│   "
+            tree_str += generate_tree(path, ignore_dirs, prefix + extension)
+    return tree_str
+
 def main():
     parser = argparse.ArgumentParser(description="Pack code repository into a single text file for LLM prompts.")
     parser.add_argument("dir", nargs="?", default=".", help="Directory to pack (default: current directory)")
@@ -17,7 +37,13 @@ def main():
     allowed_extensions = {'.py', '.js', '.ts', '.html', '.css', '.md', '.txt', '.json', '.java', '.cpp', '.h'}
 
     output_content = []
-    output_content.append(f"# Codebase Context\n\n")
+    output_content.append(f"# Codebase Context for {os.path.abspath(args.dir)}\n\n")
+
+    # 將樹狀圖寫入最終文件
+    output_content.append("## Directory Structure\n```text\n")
+    output_content.append(os.path.basename(os.path.abspath(args.dir)) + "/\n")
+    output_content.append(generate_tree(args.dir, ignore_dirs))
+    output_content.append("```\n\n")
 
     for root, dirs, files in os.walk(args.dir):
         if is_ignored(root, ignore_dirs):
